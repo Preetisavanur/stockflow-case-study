@@ -44,153 +44,153 @@ GET /api/companies/{company\_id}/alerts/low-stock
 
 def get\_low\_stock\_alerts(company\_id):
 
-&#x20;   try:
+   try:
 
-&#x20;       alerts = \[]
+       alerts = \[]
 
 
 
-&#x20;       # Step 1: Fetch product, inventory, warehouse, and supplier data
+       # Step 1: Fetch product, inventory, warehouse, and supplier data
 
-&#x20;       results = db.session.execute("""
+       results = db.session.execute("""
 
-&#x20;           SELECT 
+           SELECT 
 
-&#x20;               p.id AS product\_id,
+               p.id AS product\_id,
 
-&#x20;               p.name AS product\_name,
+               p.name AS product\_name,
 
-&#x20;               p.sku,
+               p.sku,
 
-&#x20;               p.threshold,
+               p.threshold,
 
-&#x20;               w.id AS warehouse\_id,
+               w.id AS warehouse\_id,
 
-&#x20;               w.name AS warehouse\_name,
+               w.name AS warehouse\_name,
 
-&#x20;               i.quantity AS current\_stock,
+               i.quantity AS current\_stock,
 
-&#x20;               s.id AS supplier\_id,
+               s.id AS supplier\_id,
 
-&#x20;               s.name AS supplier\_name,
+               s.name AS supplier\_name,
 
-&#x20;               s.contact\_email
+               s.contact\_email
 
-&#x20;           FROM products p
+           FROM products p
 
-&#x20;           JOIN inventory i ON p.id = i.product\_id
+           JOIN inventory i ON p.id = i.product\_id
 
-&#x20;           JOIN warehouses w ON i.warehouse\_id = w.id
+           JOIN warehouses w ON i.warehouse\_id = w.id
 
-&#x20;           LEFT JOIN product\_suppliers ps ON p.id = ps.product\_id
+           LEFT JOIN product\_suppliers ps ON p.id = ps.product\_id
 
-&#x20;           LEFT JOIN suppliers s ON ps.supplier\_id = s.id
+           LEFT JOIN suppliers s ON ps.supplier\_id = s.id
 
-&#x20;           WHERE p.company\_id = :company\_id
+           WHERE p.company\_id = :company\_id
 
-&#x20;       """, {"company\_id": company\_id})
+       """, {"company\_id": company\_id})
 
 
 
-&#x20;       for row in results:
+       for row in results:
 
 
 
-&#x20;           # Step 2: Check if stock is below threshold
+           # Step 2: Check if stock is below threshold
 
-&#x20;           if row.current\_stock >= row.threshold:
+           if row.current\_stock >= row.threshold:
 
-&#x20;               continue
+               continue
 
 
 
-&#x20;           # Step 3: Check recent sales (last 30 days)
+           # Step 3: Check recent sales (last 30 days)
 
-&#x20;           recent\_sales = db.session.execute("""
+           recent\_sales = db.session.execute("""
 
-&#x20;               SELECT COALESCE(SUM(quantity\_sold), 0)
+               SELECT COALESCE(SUM(quantity\_sold), 0)
 
-&#x20;               FROM sales
+               FROM sales
 
-&#x20;               WHERE product\_id = :pid
+               WHERE product\_id = :pid
 
-&#x20;               AND created\_at >= NOW() - INTERVAL '30 days'
+               AND created\_at >= NOW() - INTERVAL '30 days'
 
-&#x20;           """, {"pid": row.product\_id}).scalar()
+           """, {"pid": row.product\_id}).scalar()
 
 
 
-&#x20;           if recent\_sales == 0:
+           if recent\_sales == 0:
 
-&#x20;               continue
+               continue
 
 
 
-&#x20;           # Step 4: Calculate average daily sales
+           # Step 4: Calculate average daily sales
 
-&#x20;           avg\_daily\_sales = recent\_sales / 30
+           avg\_daily\_sales = recent\_sales / 30
 
 
 
-&#x20;           # Step 5: Calculate days until stockout
+           # Step 5: Calculate days until stockout
 
-&#x20;           if avg\_daily\_sales == 0:
+           if avg\_daily\_sales == 0:
 
-&#x20;               days\_until\_stockout = None
+               days\_until\_stockout = None
 
-&#x20;           else:
+           else:
 
-&#x20;               days\_until\_stockout = int(row.current\_stock / avg\_daily\_sales)
+               days\_until\_stockout = int(row.current\_stock / avg\_daily\_sales)
 
 
 
-&#x20;           # Step 6: Build alert response
+           # Step 6: Build alert response
 
-&#x20;           alerts.append({
+           alerts.append({
 
-&#x20;               "product\_id": row.product\_id,
+               "product\_id": row.product\_id,
 
-&#x20;               "product\_name": row.product\_name,
+               "product\_name": row.product\_name,
 
-&#x20;               "sku": row.sku,
+               "sku": row.sku,
 
-&#x20;               "warehouse\_id": row.warehouse\_id,
+               "warehouse\_id": row.warehouse\_id,
 
-&#x20;               "warehouse\_name": row.warehouse\_name,
+               "warehouse\_name": row.warehouse\_name,
 
-&#x20;               "current\_stock": row.current\_stock,
+               "current\_stock": row.current\_stock,
 
-&#x20;               "threshold": row.threshold,
+               "threshold": row.threshold,
 
-&#x20;               "days\_until\_stockout": days\_until\_stockout,
+               "days\_until\_stockout": days\_until\_stockout,
 
-&#x20;               "supplier": {
+               "supplier": {
 
-&#x20;                   "id": row.supplier\_id,
+                   "id": row.supplier\_id,
 
-&#x20;                   "name": row.supplier\_name,
+                   "name": row.supplier\_name,
 
-&#x20;                   "contact\_email": row.contact\_email
+                   "contact\_email": row.contact\_email
 
-&#x20;               } if row.supplier\_id else None
+               } if row.supplier\_id else None
 
-&#x20;           })
+           })
 
 
 
-&#x20;       return {
+       return {
 
-&#x20;           "alerts": alerts,
+           "alerts": alerts,
 
-&#x20;           "total\_alerts": len(alerts)
+           "total\_alerts": len(alerts)
 
-&#x20;       }, 200
+       }, 200
 
 
 
-&#x20;   except Exception as e:
+   except Exception as e:
 
-&#x20;       return {"error": str(e)}, 500
+       return {"error": str(e)}, 500
 
 3.4 Approach
 
